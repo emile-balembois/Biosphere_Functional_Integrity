@@ -4,12 +4,12 @@ This repository provides three Python scripts to compute a **biosphere functiona
 
 The repository contains two alternative workflows for the same final calculation:
 
-- **`Integrity_Vector_Git_Ready_GenericPaths.py`**: use this when your land-cover database is in **vector** format.
-- **`Integrity_Raster_Git_Ready_GenericPaths.py`**: use this when your land-cover database is already in **raster** format.
+- **`Integrity_Vector.py`**: use this when your land-cover database is in **vector** format.
+- **`Integrity_Raster.py`**: use this when your land-cover database is already in **raster** format.
 
 It also contains one preparation/refinement workflow:
 
-- **`Intersection_Vectors_Git_Ready_GenericPaths.py`**: use this to **overlay two polygon databases** and create an improved classification before running the integrity calculation. This is useful when a broad land-cover category may contain both **semi-natural** and **non-semi-natural** situations, and a second database can help separate them more precisely.
+- **`Intersection_Vectors.py`**: use this to **overlay two polygon databases** and create an improved classification before running the integrity calculation. This is useful when a broad land-cover category may contain both **semi-natural** and **dominated by human** situations, and a second database can help separate them more precisely.
 
 ---
 
@@ -27,9 +27,8 @@ The paper highlights in particular three families of contributions that motivate
 
 The same review also shows that, for five nature’s contributions to people, provision becomes **very low or almost absent below 10% habitat**.
 
-In practice, this repository turns that scientific insight into a GIS workflow that:
-
-1. classifies land-cover into **semi-natural = 1**, **non-semi-natural = 0**, and **ignored / null = NaN**,
+In practice, this repository proposes a GIS workflow to compute this indicator :
+1. classifies land-cover into **semi-natural = 1**, **dominated by human = 0**, and **land cover ignored in calculation = NaN**,
 2. computes a moving-window share of semi-natural habitat around each pixel,
 3. exports maps and histograms that can be used for territorial diagnosis.
 
@@ -39,9 +38,9 @@ In practice, this repository turns that scientific insight into a GIS workflow t
 
 | File | Purpose | Typical use case |
 |---|---|---|
-| `Integrity_Vector_Git_Ready_GenericPaths.py` | Computes the integrity indicator from a **vector land-cover layer** | Your source database is a polygon layer (e.g. GeoPackage / shapefile) with a classification field |
-| `Integrity_Raster_Git_Ready_GenericPaths.py` | Computes the same integrity indicator from a **raster land-cover layer** | Your source database is already rasterized |
-| `Intersection_Vectors_Git_Ready_GenericPaths.py` | Overlays two polygon datasets and builds a refined output classification | A main category in the primary database may mix both class `0` and class `1`, and a secondary database helps disambiguate it |
+| `Integrity_Vector.py` | Computes the integrity indicator from a **vector land-cover layer** | Your source database is a polygon layer (GeoPackage / shapefile) |
+| `Integrity_Raster.py` | Computes the same integrity indicator from a **raster land-cover layer** | Your source database is a raser layer |
+| `Intersection_Vectors.py` | Overlays two polygon datasets and builds a refined output classification | A main category in the primary database may mix both class `0` and class `1`, and a secondary database helps disambiguate it |
 
 ---
 
@@ -50,9 +49,8 @@ In practice, this repository turns that scientific insight into a GIS workflow t
 ### 1. Optional refinement of the land-cover classification
 
 Some land-cover classes are too broad for direct functional integrity analysis. A category may contain both:
-
 - areas that should be treated as **semi-natural**,
-- and areas that should be treated as **non-semi-natural**.
+- and areas that should be treated as **dominated by human**.
 
 `Intersection_Vectors_Git_Ready_GenericPaths.py` addresses this issue by:
 
@@ -66,10 +64,9 @@ This step improves the ecological meaning of the final binary classification.
 ### 2. Reclassify land cover into 1 / 0 / NaN
 
 Both integrity scripts start from a categorical land-cover dataset and assign each value to one of three groups:
-
-- **`1`**: semi-natural habitat,
-- **`0`**: non-semi-natural habitat,
-- **`NaN`**: ignored / null values.
+- **`1`**: semi-natural land cover,
+- **`0`**: land cover dominated by human,
+- **`NaN`**: land cover ignored in calculation.
 
 This classification is controlled by user-editable parameter strings such as `CLASSES_1`, `CLASSES_0`, and `CLASSES_NULL`.
 
@@ -77,41 +74,38 @@ This classification is controlled by user-editable parameter strings such as `CL
 
 The local integrity value is computed as the **mean share of semi-natural habitat** within a moving neighborhood around each pixel.
 
-Operationally, the scripts use a **1000 m convolution diameter** (that is, a **500 m radius** neighborhood by default), which is aligned with the implementation described by Mohamed et al. (2024) for mapping habitat cover around each pixel.
+Operationally, the scripts use a **1000 m convolution diameter** (that is, a **500 m radius** neighborhood by default), which is aligned with the implementation described in the methods of Mohamed et al. (2024).
 
 A pixel value therefore represents a local proportion ranging from **0 to 1**:
-
 - **0** = no semi-natural habitat in the surrounding neighborhood,
 - **1** = entirely semi-natural surrounding neighborhood,
-- intermediate values = mixed landscape context.
 
 ### 4. Compare results with a reference threshold
 
 The scripts export histogram outputs so that users can compare the territory against reference thresholds such as:
 - **0.20**,
 - **0.25** (default value)
+These two values represent the uncertainty zone defined by Mohamed et al. (2024). Below 0.20–0.25, biosphere functional integrity is no longer sustained.
 ---
 
 ## What each script does
-### `Intersection_Vectors_Git_Ready_GenericPaths.py`
+### `Intersection_Vectors.py`
 
 Use this script **before** the integrity calculation when a single land-cover dataset is not precise enough.
 
 Main steps:
-
 1. read a **primary** polygon database and a **secondary** polygon database,
 2. validate geometry and required fields,
-3. overlay only the subset of primary polygons that need refinement,
-4. apply ordered **rule-based recoding**,
+3. overlay only the subset of primary polygons that need refinement. The polygons that does not need refinement keep the value of the primary field,
+4. apply ordered **rule-based recoding** in this overlay corresponding to define a value for each polygon in the overlay following the original value of primary and secondary fields for this polygon,
 5. write an output GeoPackage with a refined code field.
 
 Typical use:
-
 - the **primary database** provides the main territorial land-cover geometry,
-- the **secondary database** adds ecological detail for ambiguous categories,
+- the **secondary database** adds ecological detail for ambiguous categories (e.g. pasture VS grassland),
 - the output field becomes the classification field used later by `Integrity_Vector`.
 
-### `Integrity_Vector_Git_Ready_GenericPaths.py`
+### `Integrity_Vector.py`
 
 Use this script when the input land-cover database is a **vector dataset**.
 
@@ -128,7 +122,7 @@ Main steps:
    - a **PNG histogram**.
 
 
-### `Integrity_Raster_Git_Ready_GenericPaths.py`
+### `Integrity_Raster.py`
 
 Use this script when the input land-cover database is already a **raster**.
 
@@ -162,8 +156,8 @@ Both integrity scripts require:
   - **raster** for `Integrity_Raster`,
 - the definition of which classes correspond to:
   - semi-natural habitat,
-  - non-semi-natural habitat,
-  - null / ignored values.
+  - land cover dominated by human,
+  - land cover ignored in calculation.
 
 ---
 
@@ -205,9 +199,9 @@ with your own file locations.
 
 ### 2. Choose the appropriate workflow
 
-- Use **`Intersection_Vectors_Git_Ready_GenericPaths.py`** if you first need to refine a land-cover classification.
-- Use **`Integrity_Vector_Git_Ready_GenericPaths.py`** if your final classified source is a vector layer.
-- Use **`Integrity_Raster_Git_Ready_GenericPaths.py`** if your final classified source is already a raster.
+- Use **`Intersection_Vectors.py`** if you first need to refine a land-cover classification.
+- Use **`Integrity_Vector_Git.py`** if your final classified source is a vector layer.
+- Use **`Integrity_Raster_Git.py`** if your final classified source is already a raster.
 
 ### 3. Run the script
 
@@ -216,7 +210,7 @@ with your own file locations.
 ## Important assumptions and limitations
 - The scripts assume a **projected CRS in meters** for distance-based processing.
 - The integrity value depends on the **quality of the input classification**. If broad categories mix ecologically different situations, use the overlay workflow first.
-- The scripts produce an **operational territorial indicator**, not a full ecological assessment of habitat quality, species composition, or ecosystem condition.
+- The scripts produce one indicator on biosphere functional integrity, not a full ecological assessment of habitat quality, species composition, or ecosystem condition.
 - Thresholds such as **20%** and **25%** should be interpreted as **generic reference levels**, and local ecological context still matters.
 
 ---
