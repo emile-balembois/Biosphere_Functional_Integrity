@@ -1,0 +1,87 @@
+2026-04-13 09:09:20 | INFO     | READ | Territory vector path: Test\Emprise.gpkg
+2026-04-13 09:09:20 | INFO     | READ | Territory layer: buffered
+2026-04-13 09:09:20 | INFO     | READ | Territory features: 1
+2026-04-13 09:09:20 | INFO     | READ | Territory bounds: (782010.0, 6499597.8, 783464.8, 6501099.4)
+2026-04-13 09:09:20 | INFO     | CONFIG | Input vector bounds: (781392.94, 6499250.69, 784301.24, 6501969.11)
+2026-04-13 09:09:20 | INFO     | CONFIG | Integrity territory bounds: (782010.0, 6499597.8, 783464.8, 6501099.4)
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization CRS: EPSG:2154
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization resolution: 5.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Requested convolution diameter: 1000.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Requested convolution radius: 500.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Pixel size for kernel: 5.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Kernel size: 201 px
+2026-04-13 09:09:20 | INFO     | CONFIG | Effective convolution radius: 500.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Buffer source: auto
+2026-04-13 09:09:20 | INFO     | CONFIG | Buffer distance used: 505.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Buffered calculation extent: (781505.0, 6499092.8, 783969.8, 6501604.4)
+2026-04-13 09:09:20 | INFO     | CONFIG | Output directory: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output
+2026-04-13 09:09:20 | INFO     | CONFIG | Execution log: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\execution.log
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization output: Test\Rasterized_COSIA_CarHab.tif
+2026-04-13 09:09:20 | INFO     | CONFIG | Integrity output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\integrity_output.tif
+2026-04-13 09:09:20 | INFO     | CONFIG | Binary output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\binary_output.tif
+2026-04-13 09:09:20 | INFO     | CONFIG | Parallel jobs: 7
+2026-04-13 09:09:20 | INFO     | CONFIG | Tile size: 2048 px
+2026-04-13 09:09:20 | INFO     | CONFIG | Kernel mode: circular_fft
+2026-04-13 09:09:20 | INFO     | ========================================================================================
+2026-04-13 09:09:20 | INFO     | START | BLOCK 1/4 | Input vector analysis and class validation
+2026-04-13 09:09:20 | INFO     | ========================================================================================
+2026-04-13 09:09:20 | INFO     | READ | Input vector path: Test\COSIA_CarHab.gpkg
+2026-04-13 09:09:20 | INFO     | READ | Selected input layer: primary_secondary_intersection
+2026-04-13 09:09:20 | INFO     | READ | Classification field: Code_Primary_Secondary
+2026-04-13 09:09:20 | INFO     | READ | Field schema type: int
+2026-04-13 09:09:20 | INFO     | READ | Number of features: 48549
+2026-04-13 09:09:20 | INFO     | VALIDATE | Field validation mode: adaptive fast path (GeoPackage SQL)
+2026-04-13 09:09:20 | INFO     | REPORT | Unique field values to classify:
+1 2 3 4 5 6 8 9 10 11 12 13 14 15 120 121
+2026-04-13 09:09:20 | INFO     | VALIDATE | Checking class coverage and class overlaps.
+2026-04-13 09:09:20 | INFO     | VALIDATE | All classification values are assigned correctly.
+2026-04-13 09:09:20 | INFO     | COMPLETE | BLOCK 1/4 | Input vector analysis and class validation
+2026-04-13 09:09:20 | INFO     | ========================================================================================
+2026-04-13 09:09:20 | INFO     | START | BLOCK 2/4 | Rasterization of the classification field
+2026-04-13 09:09:20 | INFO     | ========================================================================================
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization bounds: (781505.0, 6499092.8, 783969.8, 6501604.4)
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization resolution: 5.000 m
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization tile size: 2048 px
+2026-04-13 09:09:20 | INFO     | CONFIG | Rasterization workers: 7
+2026-04-13 09:09:20 | INFO     | PREPARE | Initializing the rasterized output with nodata values.
+2026-04-13 09:09:37 | INFO     | WRITE | Rasterized output written: Test\Rasterized_COSIA_CarHab.tif
+2026-04-13 09:09:37 | INFO     | REPORT | Raster size: 493 x 503 px
+2026-04-13 09:09:37 | INFO     | REPORT | Resolution: 5.000 m
+2026-04-13 09:09:37 | INFO     | COMPLETE | BLOCK 2/4 | Rasterization of the classification field
+2026-04-13 09:09:37 | INFO     | ========================================================================================
+2026-04-13 09:09:37 | INFO     | START | BLOCK 3/4 | Functional integrity computation and raster export
+2026-04-13 09:09:37 | INFO     | ========================================================================================
+2026-04-13 09:09:37 | INFO     | CONFIG | Classified raster input: Test\Rasterized_COSIA_CarHab.tif
+2026-04-13 09:09:37 | INFO     | CONFIG | Pixel size used: 5.000 m
+2026-04-13 09:09:37 | INFO     | CONFIG | Kernel diameter: 1000.000 m
+2026-04-13 09:09:37 | INFO     | CONFIG | Kernel size: 201 px (radius 100 px)
+2026-04-13 09:09:37 | INFO     | CONFIG | Buffered raster size: 493 x 503 px
+2026-04-13 09:09:37 | INFO     | CONFIG | Integrity window size: 291 x 300 px
+2026-04-13 09:09:37 | INFO     | CONFIG | Binary output size: 493 x 503 px
+2026-04-13 09:09:37 | INFO     | CONFIG | Buffer distance used: 505.000 m
+2026-04-13 09:09:37 | INFO     | CONFIG | Parallel jobs: 7
+2026-04-13 09:09:37 | INFO     | CONFIG | Tile size: 2048 px
+2026-04-13 09:09:37 | INFO     | CONFIG | Kernel mode: circular_fft
+2026-04-13 09:09:37 | INFO     | PREPARE | Building the buffered and territory masks.
+2026-04-13 09:09:37 | INFO     | PREPARE | Initializing the integrity output raster.
+2026-04-13 09:09:37 | INFO     | PREPARE | Initializing the binary output raster.
+2026-04-13 09:09:38 | INFO     | PREPARE | Integrity tile r0 c0 | write=291x300 px | halo=491x500 px | read=0.00s
+2026-04-13 09:09:40 | INFO     | WRITE | Integrity output written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\integrity_output.tif
+2026-04-13 09:09:40 | INFO     | PREPARE | Exporting the binary raster over the buffered calculation area.
+2026-04-13 09:09:40 | INFO     | WRITE | Binary output written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\binary_output.tif
+2026-04-13 09:09:40 | INFO     | COMPLETE | BLOCK 3/4 | Functional integrity computation and raster export
+2026-04-13 09:09:40 | INFO     | ========================================================================================
+2026-04-13 09:09:40 | INFO     | START | BLOCK 4/4 | Integrity histogram export
+2026-04-13 09:09:40 | INFO     | ========================================================================================
+2026-04-13 09:09:40 | INFO     | CONFIG | Histogram CSV: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\histogram.csv
+2026-04-13 09:09:40 | INFO     | CONFIG | Histogram PNG: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\histogram.png
+2026-04-13 09:09:40 | INFO     | CONFIG | Histogram bin width: 0.01
+2026-04-13 09:09:40 | INFO     | CONFIG | Histogram thresholds: [0.25]
+2026-04-13 09:09:40 | INFO     | CONFIG | Exclude zero values from histogram: True
+2026-04-13 09:09:40 | INFO     | WRITE | Histogram CSV written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\histogram.csv
+2026-04-13 09:09:41 | INFO     | WRITE | Histogram PNG written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output\histogram.png
+2026-04-13 09:09:41 | INFO     | REPORT | Valid pixels included in the histogram (non-zero only): 78246
+2026-04-13 09:09:41 | INFO     | REPORT | proportion >= 0.25: 0.055
+2026-04-13 09:09:41 | INFO     | COMPLETE | BLOCK 4/4 | Integrity histogram export
+2026-04-13 09:09:41 | INFO     | SUCCESS | Workflow completed successfully.
+2026-04-13 09:09:41 | INFO     | REPORT | Total runtime: 20.6 s
