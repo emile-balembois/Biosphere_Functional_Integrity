@@ -86,11 +86,11 @@ from tqdm import tqdm
 # -------------------------
 # Inputs
 # -------------------------
-INPUT_VECTOR: str = r"path\to\input_vector.gpkg"
+INPUT_VECTOR: str = r"path/to/file"
 INPUT_LAYER: Optional[str] = None         # None = auto-detect the first layer containing FIELD_NAME
-FIELD_NAME: str = "field_name"    # integer field used for classification and rasterization
+FIELD_NAME: str = "layer_name"    # integer field used for classification and rasterization
 
-TERRITORY_VECTOR: str = r"path\to\territory_vector.gpkg"
+TERRITORY_VECTOR: str = r"path/to/file"
 TERRITORY_LAYER: Optional[str] = None     # optional; use only if the file contains several layers
 
 # -------------------------
@@ -106,16 +106,15 @@ CLASSES_NULL: str = ""
 # -------------------------
 # Rasterization outputs
 # -------------------------
-RASTERIZED_TIF: str = r"path\to\classified_raster.tif"
+RASTERIZED_TIF: str = r"path/to/file.tif"
 RESOLUTION: float = 5.0
 ALL_TOUCHED: bool = False
 RASTER_NODATA: int = -2147483648          # int32 nodata sentinel for the classified raster
 
 # -------------------------
-# Integrity outputs
+# Integrity and histogram outputs
 # -------------------------
-OUT_TIF: str = r"path\to\integrity_output.tif"
-SN_TIF: str = r"path\to\binary_output.tif"
+OUTPUT_DIR: str = r"path/to/directory"  # creates or reuses an "Output" subfolder inside
 CONV_SIZE_M: float = 1000.0               # kernel diameter in meters
 PIXEL_MAX_M: Optional[float] = None       # if None, use the true raster resolution
 BUFFER_M: Optional[float] = None          # None = auto-compute from the convolution kernel
@@ -123,11 +122,9 @@ OUTPUT_NODATA: float = -9999.0
 KERNEL_SHAPE: str = "circular_fft"       # "circular_fft" or "box"
 
 # -------------------------
-# Histogram outputs
+# Histogram settings
 # Same logic and style as the original histogram script.
 # -------------------------
-HIST_CSV: str = r"path\to\histogram.csv"
-HIST_PNG: str = r"path\to\histogram.png"
 HIST_BIN_WIDTH: float = 0.01
 HIST_THRESHOLDS: List[float] = [0.25]
 HIST_EXCLUDE_ZERO: bool = True
@@ -163,26 +160,37 @@ RIO_PROFILE_KW: Dict = dict(
 LOGGER = logging.getLogger("functional_integrity_vector")
 
 
-def configure_logging(level: str = "INFO") -> None:
-    """Configure console logging for the workflow.
+def configure_logging(level: str = "INFO", log_file_path: str | None = None) -> None:
+    """Configure console and optional file logging for the workflow.
 
     Parameters
     ----------
     level : str, default="INFO"
-        Logging threshold passed to the console handler.
+        Logging threshold passed to the handlers.
+    log_file_path : str or None, default=None
+        Optional path for the execution log file.
     """
     LOGGER.handlers.clear()
     LOGGER.setLevel(getattr(logging, level.upper(), logging.INFO))
     LOGGER.propagate = False
 
-    handler = logging.StreamHandler()
-    handler.setLevel(getattr(logging, level.upper(), logging.INFO))
+    handler_level = getattr(logging, level.upper(), logging.INFO)
     formatter = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    handler.setFormatter(formatter)
-    LOGGER.addHandler(handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(handler_level)
+    console_handler.setFormatter(formatter)
+    LOGGER.addHandler(console_handler)
+
+    if log_file_path:
+        ensure_parent_dirs([log_file_path])
+        file_handler = logging.FileHandler(log_file_path, mode="w", encoding="utf-8")
+        file_handler.setLevel(handler_level)
+        file_handler.setFormatter(formatter)
+        LOGGER.addHandler(file_handler)
 
 
 def log_section(title: str) -> None:
@@ -240,6 +248,56 @@ def ensure_parent_dirs(paths: Iterable[str]) -> None:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
+
+
+def resolve_output_dir(base_dir: str) -> str:
+    """Resolve the final output directory used by the workflow.
+
+    Parameters
+    ----------
+    base_dir : str
+        Parent directory configured by the user.
+
+    Returns
+    -------
+    str
+        Absolute path to the output directory.
+    """
+    if not base_dir or not base_dir.strip():
+        raise ValueError("OUTPUT_DIR must point to a parent directory.")
+
+    normalized = os.path.normpath(os.path.abspath(base_dir))
+    if os.path.basename(normalized).lower() == "output":
+        output_dir = normalized
+    else:
+        output_dir = os.path.join(normalized, "Output")
+
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def build_output_paths(base_dir: str) -> dict[str, str]:
+    """Build the standardized output paths for the workflow.
+
+    Parameters
+    ----------
+    base_dir : str
+        Parent directory configured by the user.
+
+    Returns
+    -------
+    dict of str
+        Mapping containing the output directory and all generated file paths.
+    """
+    output_dir = resolve_output_dir(base_dir)
+    return {
+        "output_dir": output_dir,
+        "out_tif": os.path.join(output_dir, "integrity_output.tif"),
+        "sn_tif": os.path.join(output_dir, "binary_output.tif"),
+        "hist_csv": os.path.join(output_dir, "histogram.csv"),
+        "hist_png": os.path.join(output_dir, "histogram.png"),
+        "log_file": os.path.join(output_dir, "execution.log"),
+    }
 
 
 def format_values(values: Sequence[int], values_per_line: int = 20) -> str:
@@ -2002,6 +2060,8 @@ def export_histogram(
 
 def main() -> None:
     """Run the complete four-block vector-based integrity workflow."""
+    output_paths = build_output_paths(OUTPUT_DIR)
+    configure_logging(LOG_LEVEL, output_paths["log_file"])
     start = time.perf_counter()
 
     (
@@ -2062,9 +2122,11 @@ def main() -> None:
     LOGGER.info("CONFIG | Buffer source: %s", buffer_source)
     LOGGER.info("CONFIG | Buffer distance used: %.3f m", resolved_buffer_m)
     LOGGER.info("CONFIG | Buffered calculation extent: %s", rasterize_bounds)
+    LOGGER.info("CONFIG | Output directory: %s", output_paths["output_dir"])
+    LOGGER.info("CONFIG | Execution log: %s", output_paths["log_file"])
     LOGGER.info("CONFIG | Rasterization output: %s", RASTERIZED_TIF)
-    LOGGER.info("CONFIG | Integrity output: %s", OUT_TIF)
-    LOGGER.info("CONFIG | Binary output: %s", SN_TIF)
+    LOGGER.info("CONFIG | Integrity output: %s", output_paths["out_tif"])
+    LOGGER.info("CONFIG | Binary output: %s", output_paths["sn_tif"])
     LOGGER.info("CONFIG | Parallel jobs: %s", N_JOBS)
     LOGGER.info("CONFIG | Tile size: %s px", TILE_PX)
     LOGGER.info("CONFIG | Kernel mode: %s", KERNEL_SHAPE)
@@ -2109,8 +2171,8 @@ def main() -> None:
         raster_path=RASTERIZED_TIF,
         territory_vector_path=TERRITORY_VECTOR,
         territory_layer=territory_layer,
-        out_tif=OUT_TIF,
-        sn_tif=SN_TIF,
+        out_tif=output_paths["out_tif"],
+        sn_tif=output_paths["sn_tif"],
         territory_bounds=territory_bounds,
         ranges_1=ranges_1,
         ranges_0=ranges_0,
@@ -2126,16 +2188,16 @@ def main() -> None:
     log_block_end(3, 4, "Functional integrity computation and raster export")
 
     log_block_start(4, 4, "Integrity histogram export")
-    LOGGER.info("CONFIG | Histogram CSV: %s", HIST_CSV)
-    LOGGER.info("CONFIG | Histogram PNG: %s", HIST_PNG)
+    LOGGER.info("CONFIG | Histogram CSV: %s", output_paths["hist_csv"])
+    LOGGER.info("CONFIG | Histogram PNG: %s", output_paths["hist_png"])
     LOGGER.info("CONFIG | Histogram bin width: %s", HIST_BIN_WIDTH)
     LOGGER.info("CONFIG | Histogram thresholds: %s", HIST_THRESHOLDS)
     LOGGER.info("CONFIG | Exclude zero values from histogram: %s", HIST_EXCLUDE_ZERO)
 
     export_histogram(
-        raster_path=OUT_TIF,
-        csv_path=HIST_CSV,
-        png_path=HIST_PNG,
+        raster_path=output_paths["out_tif"],
+        csv_path=output_paths["hist_csv"],
+        png_path=output_paths["hist_png"],
         bin_width=HIST_BIN_WIDTH,
         thresholds=HIST_THRESHOLDS,
         exclude_zero=HIST_EXCLUDE_ZERO,
@@ -2148,5 +2210,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    configure_logging(LOG_LEVEL)
     main()

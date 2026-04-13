@@ -67,21 +67,21 @@ from tqdm import tqdm
 
 # Input datasets.
 INPUT_PRIMARY_DATASET: str = (
-    r"path\to\primary_dataset.gpkg"
+    r"path/to/primary_layer"
 )
 INPUT_SECONDARY_DATASET: str = (
-    r"path\to\secondary_dataset.gpkg"
+    r"path/to/secondary_layer"
 )
 
 # Output dataset.
 OUTPUT_GPKG: str = (
-    r"path\to\output_dataset.gpkg"
+    r"path/to/output.gpkg"
 )
 OUTPUT_LAYER_NAME: str = "primary_secondary_intersection"
 
 # Input fields.
-PRIMARY_FIELD: str = "field_primary"
-SECONDARY_FIELD: str = "field_secondary"
+PRIMARY_FIELD: str = "field_name"
+SECONDARY_FIELD: str = "field_name"
 
 # Output field.
 OUTPUT_CODE_FIELD: str = "Code_Primary_Secondary"
@@ -100,8 +100,7 @@ GEOMETRY_PREPROCESSING_MODE: str = "light"
 # - secondary_not_in: excluded values in SECONDARY_FIELD (optional)
 # - output: value written to OUTPUT_CODE_FIELD if the rule matches
 RULES: list[dict[str, Any]] = [
-    {"primary": 12, "secondary_in": {3301, 3302, 8001}, "secondary_not_in": None, "output": 120},
-    {"primary": 12, "secondary_in": {3200, 3300}, "secondary_not_in": None, "output": 121},
+    {"primary": 12, "secondary_in": {3301, 3302, 8001}, "secondary_not_in": None, "output": 120}, # example rule
 ]
 
 # Parallelization parameters.

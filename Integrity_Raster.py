@@ -69,13 +69,9 @@ from tqdm import tqdm
 RASTER_PATH: str = r"path\to\input_raster.tiff"
 VECTOR_PATH: str = r"path\to\territory_vector.gpkg"
 
-# Raster outputs
-OUT_TIF: str = r"path\to\integrity_output.tif"
-SN_TIF: str = r"path\to\binary_output.tif"
-
-# Histogram outputs
-HISTO_CSV: str = r"path\to\histogram.csv"
-HISTO_PNG: str = r"path\to\histogram.png"
+# Output directory
+# The script creates or reuses an "Output" subfolder inside this directory.
+OUTPUT_DIR: str = r"path\to\output_parent_folder"
 
 # Raster class definitions
 CLASSES_1: str = ""                        # semi-natural = 1
@@ -107,26 +103,37 @@ LOG_LEVEL: str = "INFO"
 LOGGER = logging.getLogger("functional_integrity")
 
 
-def configure_logging(level: str = "INFO") -> None:
-    """Configure console logging for the workflow.
+def configure_logging(level: str = "INFO", log_file_path: str | None = None) -> None:
+    """Configure console and optional file logging for the workflow.
 
     Parameters
     ----------
     level : str, default="INFO"
-        Logging threshold passed to the console handler.
+        Logging threshold passed to the handlers.
+    log_file_path : str or None, default=None
+        Optional path for the execution log file.
     """
     LOGGER.handlers.clear()
     LOGGER.setLevel(getattr(logging, level.upper(), logging.INFO))
     LOGGER.propagate = False
 
-    handler = logging.StreamHandler()
-    handler.setLevel(getattr(logging, level.upper(), logging.INFO))
+    handler_level = getattr(logging, level.upper(), logging.INFO)
     formatter = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    handler.setFormatter(formatter)
-    LOGGER.addHandler(handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(handler_level)
+    console_handler.setFormatter(formatter)
+    LOGGER.addHandler(console_handler)
+
+    if log_file_path:
+        ensure_parent_dirs([log_file_path])
+        file_handler = logging.FileHandler(log_file_path, mode="w", encoding="utf-8")
+        file_handler.setLevel(handler_level)
+        file_handler.setFormatter(formatter)
+        LOGGER.addHandler(file_handler)
 
 
 def log_section(title: str) -> None:
@@ -180,6 +187,56 @@ def ensure_parent_dirs(paths: Iterable[str]) -> None:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
+
+
+def resolve_output_dir(base_dir: str) -> str:
+    """Resolve the final output directory used by the workflow.
+
+    Parameters
+    ----------
+    base_dir : str
+        Parent directory configured by the user.
+
+    Returns
+    -------
+    str
+        Absolute path to the output directory.
+    """
+    if not base_dir or not base_dir.strip():
+        raise ValueError("OUTPUT_DIR must point to a parent directory.")
+
+    normalized = os.path.normpath(os.path.abspath(base_dir))
+    if os.path.basename(normalized).lower() == "output":
+        output_dir = normalized
+    else:
+        output_dir = os.path.join(normalized, "Output")
+
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def build_output_paths(base_dir: str) -> dict[str, str]:
+    """Build the standardized output paths for the workflow.
+
+    Parameters
+    ----------
+    base_dir : str
+        Parent directory configured by the user.
+
+    Returns
+    -------
+    dict of str
+        Mapping containing the output directory and all generated file paths.
+    """
+    output_dir = resolve_output_dir(base_dir)
+    return {
+        "output_dir": output_dir,
+        "out_tif": os.path.join(output_dir, "integrity_output.tif"),
+        "sn_tif": os.path.join(output_dir, "binary_output.tif"),
+        "histo_csv": os.path.join(output_dir, "histogram.csv"),
+        "histo_png": os.path.join(output_dir, "histogram.png"),
+        "log_file": os.path.join(output_dir, "execution.log"),
+    }
 
 
 # =============================================================================
@@ -1404,11 +1461,18 @@ def functional_integrity_with_histogram(
 # SCRIPT ENTRY POINT
 # =============================================================================
 
-if __name__ == "__main__":
-    import multiprocessing as mp
+def main() -> None:
+    """Configure outputs and run the complete raster-based workflow."""
+    output_paths = build_output_paths(OUTPUT_DIR)
+    configure_logging(LOG_LEVEL, output_paths["log_file"])
 
-    mp.freeze_support()
-    configure_logging(LOG_LEVEL)
+    LOGGER.info("CONFIG | Output directory: %s", output_paths["output_dir"])
+    LOGGER.info("CONFIG | Integrity output: %s", output_paths["out_tif"])
+    LOGGER.info("CONFIG | Binary output: %s", output_paths["sn_tif"])
+    LOGGER.info("CONFIG | Histogram CSV: %s", output_paths["histo_csv"])
+    LOGGER.info("CONFIG | Histogram PNG: %s", output_paths["histo_png"])
+    LOGGER.info("CONFIG | Execution log: %s", output_paths["log_file"])
+
     functional_integrity_with_histogram(
         raster_path=RASTER_PATH,
         vector_path=VECTOR_PATH,
@@ -1416,11 +1480,18 @@ if __name__ == "__main__":
         classes_1=CLASSES_1,
         classes_0=CLASSES_0,
         classes_null=CLASSES_NULL,
-        out_tif=OUT_TIF,
-        sn_tif=SN_TIF,
-        histo_csv=HISTO_CSV,
-        histo_png=HISTO_PNG,
+        out_tif=output_paths["out_tif"],
+        sn_tif=output_paths["sn_tif"],
+        histo_csv=output_paths["histo_csv"],
+        histo_png=output_paths["histo_png"],
         pixel_max_m=PIXEL_MAX_M,
         n_jobs=N_JOBS,
         tile_px=TILE_PX,
     )
+
+
+if __name__ == "__main__":
+    import multiprocessing as mp
+
+    mp.freeze_support()
+    main()
