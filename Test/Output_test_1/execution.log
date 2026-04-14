@@ -1,0 +1,53 @@
+2026-04-14 10:33:57 | INFO     | CONFIG | Output directory: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output
+2026-04-14 10:33:57 | INFO     | CONFIG | Integrity output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\integrity_output.tif
+2026-04-14 10:33:57 | INFO     | CONFIG | Binary output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\binary_output.tif
+2026-04-14 10:33:57 | INFO     | CONFIG | Histogram CSV: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.csv
+2026-04-14 10:33:57 | INFO     | CONFIG | Histogram PNG: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.png
+2026-04-14 10:33:57 | INFO     | CONFIG | Execution log: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\execution.log
+2026-04-14 10:33:57 | INFO     | CONFIG | Exclude zero values from histogram: False
+2026-04-14 10:33:57 | INFO     | READ | Opening vector layer: Test\Emprise.gpkg
+2026-04-14 10:33:58 | INFO     | CONFIG | Raster input                    : Test\Raster_layer_CLC.tif
+2026-04-14 10:33:58 | INFO     | CONFIG | Vector input                    : Test\Emprise.gpkg
+2026-04-14 10:33:58 | INFO     | CONFIG | Effective resolution            : 10.906 m/px
+2026-04-14 10:33:58 | INFO     | CONFIG | Requested convolution diameter  : 1000.0 m
+2026-04-14 10:33:58 | INFO     | CONFIG | Requested convolution radius    : 500.0 m
+2026-04-14 10:33:58 | INFO     | CONFIG | Effective convolution radius    : 490.785 m (45 px)
+2026-04-14 10:33:58 | INFO     | CONFIG | Automatic buffer distance       : 490.785 m
+2026-04-14 10:33:58 | INFO     | CONFIG | Territory window                : 161 x 138 px
+2026-04-14 10:33:58 | INFO     | CONFIG | Buffered calculation window     : 270 x 228 px
+2026-04-14 10:33:58 | INFO     | CONFIG | Parallel jobs                   : 7
+2026-04-14 10:33:58 | INFO     | CONFIG | Tile size                       : 2048 px
+2026-04-14 10:33:58 | INFO     | CONFIG | Kernel size                     : 91 px
+2026-04-14 10:33:58 | INFO     | CONFIG | Kernel mode                     : circular_fft
+2026-04-14 10:33:58 | INFO     | CONFIG | Integrity output                : C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\integrity_output.tif
+2026-04-14 10:33:58 | INFO     | CONFIG | Binary output                   : C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\binary_output.tif
+2026-04-14 10:33:58 | INFO     | CONFIG | Histogram CSV                   : C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.csv
+2026-04-14 10:33:58 | INFO     | CONFIG | Histogram PNG                   : C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.png
+2026-04-14 10:33:58 | INFO     | ========================================================================================
+2026-04-14 10:33:58 | INFO     | START | BLOCK 1/3 | Raster analysis and class validation
+2026-04-14 10:33:58 | INFO     | ========================================================================================
+2026-04-14 10:33:58 | INFO     | REPORT | Raster values found inside the calculation area: 1 2 3 5 6 7 9
+2026-04-14 10:33:58 | INFO     | VALIDATE | All raster values are classified correctly.
+2026-04-14 10:33:58 | INFO     | COMPLETE | BLOCK 1/3 | Raster analysis and class validation
+2026-04-14 10:33:58 | INFO     | ========================================================================================
+2026-04-14 10:33:58 | INFO     | START | BLOCK 2/3 | Functional integrity computation and raster export
+2026-04-14 10:33:58 | INFO     | ========================================================================================
+2026-04-14 10:33:58 | INFO     | PREPARE | Writing the binary raster over the buffered calculation area.
+2026-04-14 10:33:58 | INFO     | WRITE | Binary tile r0 c0 written (270x228 px).
+2026-04-14 10:33:58 | INFO     | WRITE | Output 1/2 written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\binary_output.tif
+2026-04-14 10:33:58 | INFO     | PREPARE | Writing the integrity raster over the exact territory extent.
+2026-04-14 10:33:58 | INFO     | PREPARE | Integrity tile r0 c0 | write=161x138 | halo=251x228
+2026-04-14 10:34:06 | INFO     | WRITE | Output 2/2 written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\integrity_output.tif
+2026-04-14 10:34:06 | INFO     | COMPLETE | BLOCK 2/3 | Functional integrity computation and raster export
+2026-04-14 10:34:06 | INFO     | ========================================================================================
+2026-04-14 10:34:06 | INFO     | START | BLOCK 3/3 | Integrity histogram export
+2026-04-14 10:34:06 | INFO     | ========================================================================================
+2026-04-14 10:34:06 | INFO     | READ | Reading the integrity raster to build the histogram.
+2026-04-14 10:34:06 | INFO     | WRITE | Writing histogram CSV.
+2026-04-14 10:34:06 | INFO     | WRITE | Output 1/2 written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.csv
+2026-04-14 10:34:06 | INFO     | WRITE | Rendering histogram PNG.
+2026-04-14 10:34:11 | INFO     | WRITE | Output 2/2 written: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\Test\Output_test_1\Output\histogram.png
+2026-04-14 10:34:11 | INFO     | REPORT | Valid pixels included in the histogram: 19801
+2026-04-14 10:34:11 | INFO     | REPORT | proportion >= 0.25: 0.961
+2026-04-14 10:34:11 | INFO     | COMPLETE | BLOCK 3/3 | Integrity histogram export
+2026-04-14 10:34:11 | INFO     | SUCCESS | Workflow completed successfully.

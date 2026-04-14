@@ -1,28 +1,86 @@
-# Principe du test
+# Principe des tests
 
-Ce test donne un exemple complet d'un calcul de l'indicateur d'intégrité fonctionnelle de la biosphère. Sont fournies dans le dossier des bases de données de couvertures des sols au niveau de la ville de Montbrison sur lesquels tester le calcul de l'indicateur.
+Ce dossier fournit 2 exemples complets de calcul de l'indicateur d'integrite fonctionnelle de la biosphere sur le territoire de Montbrison.
 
-# Déroulé du test
+Les deux scenarios couvrent les deux workflows principaux du depot :
+- un test raster avec `Integrity_Raster.py`,
+- un test vectoriel avec `Intersection_Vectors.py` puis `Integrity_Vector.py`.
 
-## Contenu du dossier
+# Deroule des tests
 
-- `Primary_layer_COSIA.gpkg` : champ analyse `numero`
-- `Secondary_layer_CarHab.gpkg` : champ analysé `code_physio`
-- `Primary_layer_COSIA.qml` : fichier de style pour représenter la légende fournie dans la notice de la couche `numero`
-- `Secondary_layer_CarHab.qml` : fichier de style pour représenter la légende fournie dans la notice de la couche `code_physio`
-- `Emprise.gpkg` : zone sur laquelle faire le calcul d'intégrité
+## Test 1 - `Integrity_Raster.py`
 
-## Intersection COSIA - CarHab - `Intersection_Vector`
+### Contenu du dossier pour ce test
 
-Nous proposons comme première étape de réaliser une intersection entre 2 bases de données vecteur d'usages des sols : [COSIA](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_COSIA) et [CarHab](https://cartes.gouv.fr/rechercher-une-donnee/dataset/INPN-CARHAB_HABITATS). L'objectif de ce croisement est d'augmenter la précision de la base de données de couverture des sols utilisée pour le calcul.
+- `Raster_layer_CLC.tif` : couche raster de couverture des sols a analyser.
+- `Raster_layer_CLC.qml` : fichier de style pour representer la couche raster.
+- `Emprise.gpkg` : zone sur laquelle faire le calcul d'integrite.
+- `CLCplus_Backbone_2023_Documentation.pdf` : documentation des classes presentes dans la couche raster.
 
-Le principe est d'utiliser COSIA comme couche principale car elle donne une analyse fine des couvertures arborées. Cependant, COSIA est imprécise sur les couches herbacées : dans la catégorie 12 (`Pelouse`), ne sont pas différenciés les prairies (classées en `1` - semi-naturelles) des zones d'agriculture intensives (classées en dominées par l'Homme - `0`). Une intersection avec CarHab est donc proposée pour améliorer l'analyse : la catégorie `12` est intersectée avec CarHab avec la règle suivante :
+### Calcul de l'integrite fonctionnelle de la biosphere
 
-- Si `COSIA = 12` et `CarHab = 3301` (`Prairie fauchée`) ou `3302` (`Prairie pâturée`) ou `8001` (`Prairie temporaire`) alors `COSIA_CarHab = 120` (`zones d'agriculture intensives`)
-- Si `COSIA = 12` et `CarHab = 3200` (`Vegetation herbacée haute`) ou `3300` (`Prairie indéterminée`) ou `8001` alors `COSIA_CarHab = 120` (`prairie`)
-- Sinon `COSIA = 12` (`pelouse hors prairie/pâturage, généralement des jardins particuliers`)
+Nous proposons la classification suivante pour `Raster_layer_CLC.tif` :
 
-Cela se traduit par le bloc de commande à entrer dans `Intersection_Vector.py` :
+| Number | Land cover | Classification binaire |
+| --- | --- | --- |
+| 1 | Sealed | 0 |
+| 2 | Woody needle leaved trees | 1 |
+| 3 | Woody broadleaved deciduous trees | 1 |
+| 4 | Woody broadleaved evergreen trees | 1 |
+| 5 | Low-growing woody plants | 1 |
+| 6 | Permanent herbaceous | 1 |
+| 7 | Periodically herbaceous | 0 |
+| 8 | Lichens and mosses | 1 |
+| 9 | Non- and sparsely vegetated | NA |
+| 10 | Water | NA |
+| 11 | Snow and ice | NA |
+
+Cela se traduit par le bloc de commande suivant a entrer dans `Integrity_Raster.py` :
+
+```python
+CLASSES_1: str = "2 3 4 5 6 8"   # semi-natural = 1
+CLASSES_0: str = "1 7"           # non-semi-natural = 0
+CLASSES_NULL: str = "9 10 11"    # ignored = NaN
+```
+
+### Output attendu
+
+Les outputs attendus pour ce test sont fournis dans `Output_test_1` :
+- `binary_output.tif`
+- `integrity_output.tif`
+- `histogram.csv`
+- `histogram.png`
+- `execution.log`
+- `Representation_integrité.qml`
+
+## Test 2 - `Intersection_Vectors.py` + `Integrity_Vector.py`
+
+### Contenu du dossier pour ce test
+
+- `Primary_vector_layer_COSIA.gpkg` : couche principale, champ analyse `numero`.
+- `Secondary_vector_layer_CarHab.gpkg` : couche secondaire, champ analyse `code_physio`.
+- `Primary_layer_COSIA.qml` : style de representation de la couche COSIA.
+- `Secondary_layer_CarHab.qml` : style de representation de la couche CarHab.
+- `Cosia_Documentation_Technique_IGN_2023.pdf` : documentation des classes COSIA.
+- `CarHab_42_Loire_Notice.pdf` : documentation des classes CarHab.
+- `Emprise.gpkg` : zone sur laquelle faire le calcul d'integrite.
+
+### Intersection COSIA - CarHab - `Intersection_Vectors.py`
+
+La premiere etape consiste a croiser les 2 bases de donnees vectorielles d'usages des sols :
+- [COSIA](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_COSIA)
+- [CarHab](https://cartes.gouv.fr/rechercher-une-donnee/dataset/INPN-CARHAB_HABITATS)
+
+L'objectif de ce croisement est d'ameliorer la precision de la couche de couverture des sols utilisee ensuite pour le calcul de l'indicateur.
+
+Le principe est d'utiliser COSIA comme couche principale car elle donne une analyse fine des couvertures arborees. En revanche, la categorie `12` (`Pelouse`) melange des situations qui doivent ensuite etre classees soit en `1` (semi-naturel), soit en `0` (domine par l'Homme). Une intersection avec CarHab permet de raffiner cette categorie.
+
+Exemple de regles :
+- si `COSIA = 12` et `CarHab = 3301` (`Prairie fauchee`) ou `3302` (`Prairie paturee`) ou `8001` (`Prairie temporaire`), alors `Code_Primary_Secondary = 120` ;
+- si `COSIA = 12` et `CarHab = 3200` (`Vegetation herbacee haute`) ou `3300` (`Prairie indeterminee`), alors `Code_Primary_Secondary = 121` ;
+- sinon, la valeur d'origine de COSIA est conservee.
+
+Cela se traduit par le bloc de commande suivant a entrer dans `Intersection_Vectors.py` :
 
 ```python
 RULES: list[dict[str, Any]] = [
@@ -31,33 +89,38 @@ RULES: list[dict[str, Any]] = [
 ]
 ```
 
-Le programme créé une nouvelle couche avec le champ `Code_Primary_Secondary` contenant cette intersection.
+Le programme cree une nouvelle couche avec le champ `Code_Primary_Secondary`.
 
-## Calcul de l'intégrité fonctionnelle de la biosphère - `Integrity_Vector`
+Important :
+- les regles sont evaluees dans l'ordre ;
+- si plusieurs regles correspondent a un meme polygone, la derniere regle applicable l'emporte ;
+- si cette sortie est ensuite utilisee dans `Integrity_Vector.py`, les valeurs ecrites dans `Code_Primary_Secondary` doivent rester entieres ou convertibles en entiers.
 
-Ensuite une fois la base de données de couverture des sols construite, le calcul de l'intégrité fonctionnelle de la biosphère peut être réalisé. Nous proposons la classification suivante :
+### Calcul de l'integrite fonctionnelle de la biosphere - `Integrity_Vector.py`
 
-| Numéro de la couche d'intersection | Couverture | Classification binaire |
+Une fois la base de donnees de couverture des sols construite, le calcul de l'integrite fonctionnelle de la biosphere peut etre realise. Nous proposons la classification suivante :
+
+| Numero de la couche d'intersection | Couverture | Classification binaire |
 | --- | --- | --- |
 | 1 | Batiment | 0 |
-| 2 | Zone perméable | 0 |
-| 3 | Zone imperméable | 0 |
+| 2 | Zone permeable | 0 |
+| 3 | Zone impermeable | 0 |
 | 4 | Piscine | 0 |
 | 5 | Sol nu | NA |
 | 6 | Surface eau | NA |
 | 7 | Neige | NA |
-| 8 | Conifère | 1 |
+| 8 | Conifere | 1 |
 | 9 | Feuillu | 1 |
 | 10 | Broussaille | 1 |
 | 11 | Vigne | 0 |
-| 120 | Pâturage | 0 |
+| 120 | Paturage | 0 |
 | 121 | Prairie naturelle | 1 |
 | 12 | Pelouse urbaine | 0 |
 | 13 | Culture | 0 |
-| 14 | Terre labourée | 0 |
+| 14 | Terre labouree | 0 |
 | 15 | Serre | 0 |
 
-Cela se traduit par le bloc de commande suivant à entrer dans `Integrity_Vector` :
+Cela se traduit par le bloc de commande suivant a entrer dans `Integrity_Vector.py` :
 
 ```python
 CLASSES_1: str = "8 9 10 121"
@@ -65,7 +128,14 @@ CLASSES_0: str = "1 2 3 4 11 12 13 14 15 120"
 CLASSES_NULL: str = "5 6 7"
 ```
 
-## Output
+### Output attendu
 
-Les outputs attendus sont mis dans le dossier `Output`.
-Un fichier `qml` est fournit pour offrir un exemple de style de représentation des valeurs d'intégrité.
+Les outputs attendus pour ce test sont fournis dans `Output_test_2` :
+- `Output_Intersection_COSIA_CarHab.gpkg`
+- `Output_Rasterization_COSIA_CarHab.tif`
+- `binary_output.tif`
+- `integrity_output.tif`
+- `histogram.csv`
+- `histogram.png`
+- `execution.log`
+- `Representation_integrité.qml`

@@ -38,6 +38,11 @@ Notes
 - Field values are normalized to strings internally during rule matching so
   that rule comparisons remain robust when storage dtypes differ between the
   primary and secondary fields.
+- Rules are evaluated in order. If several rules match the same feature, the
+  last matching rule overrides the previous matching outputs.
+- If the output field is reused later as the classification field in
+  ``Integrity_Vector.py``, its values must remain integers or values that can
+  be converted safely to integers.
 - If geometry preprocessing is set to ``"off"`` or ``"light"`` and the
   overlay fails, the script retries once with full geometry cleaning.
 - Console output uses Python's standard ``logging`` module.
@@ -95,10 +100,12 @@ GEOMETRY_PREPROCESSING_MODE: str = "light"
 # Recoding rules.
 #
 # Each rule is evaluated in order.
+# If several rules match the same polygon, the last matching rule wins.
 # - primary: expected value in PRIMARY_FIELD
 # - secondary_in: accepted values in SECONDARY_FIELD
 # - secondary_not_in: excluded values in SECONDARY_FIELD (optional)
 # - output: value written to OUTPUT_CODE_FIELD if the rule matches
+#           (keep it integer-compatible if the result will feed Integrity_Vector.py)
 RULES: list[dict[str, Any]] = [
     {"primary": 12, "secondary_in": {3301, 3302, 8001}, "secondary_not_in": None, "output": 120}, # example rule
 ]
@@ -614,7 +621,9 @@ def compute_code_vectorized(
     """Compute the output code field.
 
     Matching is done on normalized string representations of the field values.
-    The original primary value is kept as the default output.
+    The original primary value is kept as the default output. Rules are applied
+    sequentially, so if several rules match the same row, the last matching
+    rule overrides the previous ones.
     """
     primary_raw = df[primary_field]
     secondary_raw = df[secondary_field]
@@ -625,6 +634,8 @@ def compute_code_vectorized(
     code = primary_raw.copy()
     secondary_present = secondary_keys.notna()
 
+    # Rules are applied in order; later matching rules intentionally override
+    # previous matches on the same row.
     for rule in compiled_rules:
         mask = secondary_present & (primary_keys == rule["primary_key"])
 

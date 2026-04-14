@@ -15,8 +15,7 @@ The program takes as input:
 It is organized into four processing blocks.
 
 Block 1
-    - Analyze values in the vector layer inside the calculation area, defined as the input
-    territory buffered by the effective convolution radius.
+    - Analyze the unique values present in the input classification field.
     - Display the vector values found in the classification field and validate that every value is assigned to exactly one of the three class (0/1/NaN).
     
 
@@ -127,7 +126,7 @@ KERNEL_SHAPE: str = "circular_fft"       # "circular_fft" or "box"
 # -------------------------
 HIST_BIN_WIDTH: float = 0.01
 HIST_THRESHOLDS: List[float] = [0.25]
-HIST_EXCLUDE_ZERO: bool = True
+HIST_EXCLUDE_ZERO: bool = False
 
 # -------------------------
 # Parallelization / tiling
@@ -1877,7 +1876,7 @@ def _save_histogram_png(
 def _compute_histogram_counts(
     path_tif: str,
     bin_width: float = 0.01,
-    exclude_zero: bool = True,
+    exclude_zero: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, int]:
     """Compute the histogram of a float raster in the [0, 1] range.
 
@@ -1887,7 +1886,7 @@ def _compute_histogram_counts(
         Input raster path.
     bin_width : float, default=0.01
         Histogram bin width. Must divide 1.0 exactly.
-    exclude_zero : bool, default=True
+    exclude_zero : bool, default=False
         If ``True``, pixels equal to zero are excluded from the histogram.
 
     Returns
@@ -2010,7 +2009,9 @@ def export_histogram(
     )
 
     if total_valid == 0:
-        raise ValueError("No valid pixels found in the integrity raster (all were 0, NaN, or NoData).")
+        if exclude_zero:
+            raise ValueError("No valid pixels found in the integrity raster after excluding zeros (all were 0, NaN, or NoData).")
+        raise ValueError("No valid pixels found in the integrity raster (all were NaN or NoData).")
 
     bins_left = bins[:-1]
     bins_right = bins[1:]

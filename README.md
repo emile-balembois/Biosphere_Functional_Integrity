@@ -52,7 +52,7 @@ Some land-cover classes are too broad for direct functional integrity analysis. 
 - areas that should be treated as **semi-natural**,
 - and areas that should be treated as **dominated by human**.
 
-`Intersection_Vectors_Git_Ready_GenericPaths.py` addresses this issue by:
+`Intersection_Vectors.py` addresses this issue by:
 
 - taking a **primary polygon database**,
 - overlaying it with a **secondary polygon database**,
@@ -85,6 +85,7 @@ A pixel value therefore represents a local proportion ranging from **0 to 1**:
 The scripts export histogram outputs so that users can compare the territory against reference thresholds such as:
 - **0.20**,
 - **0.25** (default value)
+By default, histogram counts and threshold summaries are computed on **all valid integrity pixels in the territory, including zeros**.
 These two values represent the uncertainty zone defined by Mohamed et al. (2024). Below 0.20–0.25, biosphere functional integrity is no longer sustained.
 ---
 
@@ -97,8 +98,13 @@ Main steps:
 1. read a **primary** polygon database and a **secondary** polygon database,
 2. validate geometry and required fields,
 3. overlay only the subset of primary polygons that need refinement. The polygons that does not need refinement keep the value of the primary field,
-4. apply ordered **rule-based recoding** in this overlay corresponding to define a value for each polygon in the overlay following the original value of primary and secondary fields for this polygon,
+4. apply ordered **rule-based recoding** in this overlay to define a value for each polygon from the primary and secondary fields,
 5. write an output GeoPackage with a refined code field.
+
+Important rule behavior:
+- rules are evaluated in order,
+- if several rules match the same polygon, the **last matching rule wins**,
+- if the output field is later used as the classification field in `Integrity_Vector.py`, the resulting codes must remain **integers** or **integer-compatible** values.
 
 Typical use:
 - the **primary database** provides the main territorial land-cover geometry,
@@ -132,6 +138,8 @@ Main steps:
 2. inspect raster values inside the calculation area and validate class assignments,
 3. compute the binary raster and the integrity raster,
 4. export the same histogram products as in the vector version.
+
+By default, histogram counts and threshold summaries include **all valid pixels**, including pixels equal to `0`.
 
 ---
 
@@ -200,8 +208,8 @@ with your own file locations.
 ### 2. Choose the appropriate workflow
 
 - Use **`Intersection_Vectors.py`** if you first need to refine a land-cover classification.
-- Use **`Integrity_Vector_Git.py`** if your final classified source is a vector layer.
-- Use **`Integrity_Raster_Git.py`** if your final classified source is already a raster.
+- Use **`Integrity_Vector.py`** if your final classified source is a vector layer.
+- Use **`Integrity_Raster.py`** if your final classified source is already a raster.
 
 ### 3. Run the script
 

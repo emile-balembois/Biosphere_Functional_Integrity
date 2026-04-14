@@ -66,17 +66,17 @@ from tqdm import tqdm
 # =============================================================================
 
 # Active dataset
-RASTER_PATH: str = r"path\to\input_raster.tiff"
-VECTOR_PATH: str = r"path\to\territory_vector.gpkg"
+RASTER_PATH: str = r"path\to\file"
+VECTOR_PATH: str = r"path\to\file"
 
 # Output directory
 # The script creates or reuses an "Output" subfolder inside this directory.
-OUTPUT_DIR: str = r"path\to\output_parent_folder"
+OUTPUT_DIR: str = r"path\to\folder"
 
 # Raster class definitions
-CLASSES_1: str = ""                        # semi-natural = 1
-CLASSES_0: str = ""       # non-semi-natural = 0
-CLASSES_NULL: str = ""                             # ignored = NaN
+CLASSES_1: str = "2 3 4 5 6 8"                        # semi-natural = 1
+CLASSES_0: str = "1 7"       # non-semi-natural = 0
+CLASSES_NULL: str = "9 10 11"                             # ignored = NaN
 
 # Functional integrity settings
 CONV_SIZE_M: float = 1000.0
@@ -88,7 +88,7 @@ KERNEL_SHAPE: str = "circular_fft"                      # "circular_fft" or "box
 # Histogram settings
 BIN_WIDTH: float = 0.01
 THRESHOLDS: list[float] = [0.25]
-EXCLUDE_ZERO_IN_HISTOGRAM: bool = True
+EXCLUDE_ZERO_IN_HISTOGRAM: bool = False
 
 # General settings
 STRICT_VALIDATION: bool = True
@@ -736,6 +736,7 @@ def classify_binary_tile(
 
 def process_integrity_tile(
     arr: np.ndarray,
+    processing_mask: np.ndarray,
     nodata_in: float | int | None,
     ranges_1: list[tuple[int, int]],
     ranges_0: list[tuple[int, int]],
@@ -753,6 +754,10 @@ def process_integrity_tile(
     ----------
     arr : numpy.ndarray
         Raster tile including its halo.
+    processing_mask : numpy.ndarray
+        Boolean mask marking pixels that belong to the buffered calculation
+        area within the halo tile. Pixels outside this mask are excluded from
+        the convolution denominator and numerator.
     nodata_in : float, int, or None
         Input raster nodata value.
     ranges_1, ranges_0, ranges_null : list of tuple of int
@@ -770,6 +775,7 @@ def process_integrity_tile(
         Functional integrity tile without halo.
     """
     sn = classify_binary_tile(arr, nodata_in, ranges_1, ranges_0, ranges_null)
+    sn[~processing_mask] = np.nan
     valid = ~np.isnan(sn)
     fi = run_convolution(valid, sn, k_size, kernel_shape)
 
@@ -890,7 +896,7 @@ def save_histogram_png(
 def compute_histogram(
     path_tif: str,
     bin_width: float = 0.01,
-    exclude_zero: bool = True,
+    exclude_zero: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """Compute the histogram of a float raster in the [0, 1] range.
 
@@ -900,7 +906,7 @@ def compute_histogram(
         Input raster path.
     bin_width : float, default=0.01
         Histogram bin width. Must divide 1.0 exactly.
-    exclude_zero : bool, default=True
+    exclude_zero : bool, default=False
         If ``True``, pixels equal to zero are excluded from the histogram.
 
     Returns
@@ -1317,11 +1323,7 @@ def functional_integrity_with_histogram(
                 arr = src.read(1, window=win_halo, resampling=Resampling.nearest)
 
                 row_slice_halo, col_slice_halo = window_to_slices(win_halo)
-                halo_processing_mask = mask_processing[row_slice_halo, col_slice_halo]
-
-                arr = arr.copy()
-                arr[halo_processing_mask == 0] = np.int64(2_147_483_647)
-                ranges_null_tile = ranges_null + [(2_147_483_647, 2_147_483_647)]
+                halo_processing_mask = mask_processing[row_slice_halo, col_slice_halo].astype(bool, copy=False)
 
                 if VERBOSE:
                     LOGGER.info(
@@ -1336,10 +1338,11 @@ def functional_integrity_with_histogram(
 
                 task_args = (
                     arr,
+                    halo_processing_mask,
                     nodata_in,
                     ranges_1,
                     ranges_0,
-                    ranges_null_tile,
+                    ranges_null,
                     kernel_size,
                     halo_top,
                     halo_bottom,
@@ -1472,6 +1475,7 @@ def main() -> None:
     LOGGER.info("CONFIG | Histogram CSV: %s", output_paths["histo_csv"])
     LOGGER.info("CONFIG | Histogram PNG: %s", output_paths["histo_png"])
     LOGGER.info("CONFIG | Execution log: %s", output_paths["log_file"])
+    LOGGER.info("CONFIG | Exclude zero values from histogram: %s", EXCLUDE_ZERO_IN_HISTOGRAM)
 
     functional_integrity_with_histogram(
         raster_path=RASTER_PATH,
