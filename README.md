@@ -17,15 +17,13 @@ It also contains one preparation/refinement workflow:
 
 These scripts were developed to support territorial analyses of **functional integrity** in human-modified landscapes.
 
-The core idea is to estimate, for each location in a territory, the **share of (semi-)natural habitat in the surrounding landscape**. The workflow is inspired by Mohamed et al. (2024), who reviewed the evidence for several nature’s contributions to people and concluded that **at least 20%–25% of complex, diverse (semi-)natural habitat per km²** is generally needed to sustain multiple ecological functions in human-modified landscapes.
+The core idea is to estimate, for each location in a territory, the **share of (semi-)natural habitat in the surrounding landscape**. The workflow is inspired by Mohamed et al. (2024), who reviewed the evidence for several nature’s contributions to people depanding on surrounding landscape. They concluded that **at least 20%–25% of complex, diverse (semi-)natural habitat per km²** is needed to sustain multiple ecological functions in human-modified landscapes and that this provision becomes **very low or almost absent below 10% habitat**.
 
-The paper highlights in particular three families of contributions that motivated this operationalization:
+The conclusion from this paper relies on three families of nature's contributions:
 
 - **pollination**,
 - **pest and disease regulation**,
 - **positive effects on human health and well-being**.
-
-The same review also shows that, for five nature’s contributions to people, provision becomes **very low or almost absent below 10% habitat**.
 
 In practice, this repository proposes a GIS workflow to compute this indicator :
 1. classifies land-cover into **semi-natural = 1**, **dominated by human = 0**, and **land cover ignored in calculation = NaN**,
@@ -52,7 +50,7 @@ Some land-cover classes are too broad for direct functional integrity analysis. 
 - areas that should be treated as **semi-natural**,
 - and areas that should be treated as **dominated by human**.
 
-`Intersection_Vectors.py` addresses this issue by:
+`Intersection_Vectors.py` addresses this issue by enabling to intersect a given land cover database that contains such ambiguity with another land cover database solving this typical ambiguity. The program work as following:
 
 - taking a **primary polygon database**,
 - overlaying it with a **secondary polygon database**,
@@ -204,6 +202,8 @@ path\to\output.tif
 ```
 
 with your own file locations.
+
+Other parameter will have to be edited, they are explain directly in each program.
 
 ### 2. Choose the appropriate workflow
 

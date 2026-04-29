@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Compute a biosphere functional integrity indicator that consists in a convolution of 1000m radius on a binary classified land cover database.  
+"""Compute a biosphere functional integrity indicator that consists in a convolution of 500m radius on a binary classified land cover database.  
 The program is designed to use a land cover database in RASTER format.
 
 The program takes as input:
@@ -49,7 +49,7 @@ import re
 import time
 import warnings
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
-from typing import Iterable
+from typing import Iterable, Optional
 
 import geopandas as gpd
 import numpy as np
@@ -64,36 +64,83 @@ from tqdm import tqdm
 # =============================================================================
 # USER PARAMETERS
 # =============================================================================
+# -------------------------
+# Inputs
+# -------------------------
+# Input layers
+INPUT_RASTER: str = r"path\to\file.tif" # Raster land cover layer
+TERRITORY_VECTOR: str = r"path\to\file.gpkg" # Vector layer providing the extent where integrity must be computed
+TERRITORY_LAYER: Optional[str] = None     # optional; use only if the file contains several layers
 
-# Active dataset
-RASTER_PATH: str = r"path\to\file"
-VECTOR_PATH: str = r"path\to\file"
+# -------------------------
+# Parameters
+# -------------------------
+# Convolution parameters to compute integrity
+CONV_RADIUS_M: float = 500.0             # Radius of the convolution in meters, this value originates from Mohamed et al., 2024 methodology
+BUFFER_M: Optional[float] = None         # Buffer value in meters around TERRITORY_VECTOR used to compute integrity at territory edges; None = effective convolution radius + one raster pixel
 
+# Parameters for computing integrity (classification of the input raster values)
+# Syntax: individual values separated by spaces, commas, or semicolons
+CLASSES_1: str = "2 3 4 5 6 8"    # values for semi-natural habitat - example from test
+CLASSES_0: str = "1 7"            # values for non semi-natural habitat - example from test
+CLASSES_NULL: str = "9 10 11"     # values ignored in integrity calculation - example from test
+
+# Histogram parameters
+HIST_BIN_WIDTH: float = 0.01 # Bin width used to represent the histogram of integrity values
+HIST_THRESHOLDS: list[float] = [0.25] # Thresholds highlighted in the histogram, aligned with Mohamed et al., 2024
+
+# -------------------------
+# Outputs
+# -------------------------
 # Output directory
-# The script creates or reuses an "Output" subfolder inside this directory.
-OUTPUT_DIR: str = r"path\to\folder"
+OUTPUT_DIR: str = r"path\to\folder"  # Output files are written directly inside this directory.
 
-# Raster class definitions
-CLASSES_1: str = "2 3 4 5 6 8"                        # semi-natural = 1
-CLASSES_0: str = "1 7"       # non-semi-natural = 0
-CLASSES_NULL: str = "9 10 11"                             # ignored = NaN
+# -------------------------
+# Parallelization and tiling
+# -------------------------
+# Modify these parameters to optimize the efficiency of the program
+N_JOBS: int = 7 # Number of parallel worker processes; adapt to available CPU cores and RAM
+TILE_PX: int = 2048  # Width/height of processing tiles in pixels; lower for memory-limited runs, higher for faster processing when RAM allows
 
+
+# =============================================================================
+# INTERNAL CONSTANTS
+# =============================================================================
+# -------------------------
+# Settings for logging
+# -------------------------
+VERBOSE: bool = True # If False, only warnings and errors are logged to the console. This does not affect file logging.
+LOG_LEVEL: str = "INFO" 
+
+# -------------------------
 # Functional integrity settings
-CONV_SIZE_M: float = 1000.0
-PIXEL_MAX_M: float | None = None
-N_JOBS: int = 7
-TILE_PX: int = 2048
-KERNEL_SHAPE: str = "circular_fft"                      # "circular_fft" or "box"
+# -------------------------
+KERNEL_SHAPE: str = "circular_fft"    # Convolution method: "circular_fft" gives the intended circular neighborhood; "box" is faster but uses a square window and does not match the functional integrity definition
 
-# Histogram settings
-BIN_WIDTH: float = 0.01
-THRESHOLDS: list[float] = [0.25]
-EXCLUDE_ZERO_IN_HISTOGRAM: bool = False
+# -------------------------
+# Histogram representation settings
+# -------------------------
+HIST_EXCLUDE_ZERO: bool = False # Whether to exclude zero values from the histogram. This can be set to True to improve the visibility of the distribution of non-zero values if zero is over-represented in the output.
 
-# General settings
-STRICT_VALIDATION: bool = True
-VERBOSE: bool = True
-LOG_LEVEL: str = "INFO"
+# -------------------------
+# Raster NoData sentinel
+# -------------------------
+# Technical value written in output GeoTIFF files to represent missing data.
+# It should only be changed if the output raster dtype is changed as well.
+OUTPUT_NODATA: float = -9999.0
+
+# -------------------------
+# GeoTIFF creation options
+# -------------------------
+# Technical creation options shared by generated GeoTIFF rasters.
+OUTPUT_RASTER_PROFILE_KW: dict = dict(
+    driver="GTiff",
+    compress="LZW",
+    predictor=2,
+    tiled=True,
+    blockxsize=512,
+    blockysize=512,
+)
 
 
 # =============================================================================
@@ -195,7 +242,7 @@ def resolve_output_dir(base_dir: str) -> str:
     Parameters
     ----------
     base_dir : str
-        Parent directory configured by the user.
+        Output directory configured by the user.
 
     Returns
     -------
@@ -203,14 +250,9 @@ def resolve_output_dir(base_dir: str) -> str:
         Absolute path to the output directory.
     """
     if not base_dir or not base_dir.strip():
-        raise ValueError("OUTPUT_DIR must point to a parent directory.")
+        raise ValueError("OUTPUT_DIR must point to an output directory.")
 
-    normalized = os.path.normpath(os.path.abspath(base_dir))
-    if os.path.basename(normalized).lower() == "output":
-        output_dir = normalized
-    else:
-        output_dir = os.path.join(normalized, "Output")
-
+    output_dir = os.path.normpath(os.path.abspath(base_dir))
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
@@ -221,7 +263,7 @@ def build_output_paths(base_dir: str) -> dict[str, str]:
     Parameters
     ----------
     base_dir : str
-        Parent directory configured by the user.
+        Output directory configured by the user.
 
     Returns
     -------
@@ -360,18 +402,13 @@ def make_output_profile(
     """
     profile = src_profile.copy()
     profile.update(
-        driver="GTiff",
         width=int(window.width),
         height=int(window.height),
         transform=transform,
         dtype="float32",
-        nodata=-9999.0,
+        nodata=OUTPUT_NODATA,
         count=1,
-        compress="LZW",
-        predictor=2,
-        tiled=True,
-        blockxsize=512,
-        blockysize=512,
+        **OUTPUT_RASTER_PROFILE_KW,
     )
     return profile
 
@@ -925,7 +962,7 @@ def compute_histogram(
     """
     n_bins = int(round(1.0 / bin_width))
     if not math.isclose(n_bins * bin_width, 1.0, rel_tol=1e-12, abs_tol=1e-12):
-        raise ValueError("BIN_WIDTH must divide 1.0 exactly (for example 0.01, 0.02, or 0.005).")
+        raise ValueError("bin_width must divide 1.0 exactly (for example 0.01, 0.02, or 0.005).")
 
     bins = np.linspace(0.0, 1.0, n_bins + 1, dtype=np.float64)
     counts = np.zeros(n_bins, dtype=np.int64)
@@ -1048,8 +1085,9 @@ def write_histogram_csv(
 
 def functional_integrity_with_histogram(
     raster_path: str,
-    vector_path: str,
-    conv_size_m: float,
+    territory_vector: str,
+    territory_layer: Optional[str],
+    conv_radius_m: float,
     classes_1: str,
     classes_0: str,
     classes_null: str,
@@ -1057,7 +1095,7 @@ def functional_integrity_with_histogram(
     sn_tif: str,
     histo_csv: str,
     histo_png: str,
-    pixel_max_m: float | None = None,
+    buffer_m: Optional[float] = None,
     n_jobs: int = 7,
     tile_px: int = 2048,
 ) -> None:
@@ -1067,10 +1105,13 @@ def functional_integrity_with_histogram(
     ----------
     raster_path : str
         Input classified raster path.
-    vector_path : str
+    territory_vector : str
         Input territory vector path.
-    conv_size_m : float
-        Convolution diameter in meters.
+    territory_layer : str or None
+        Optional territory layer name. Use ``None`` to let GeoPandas read the
+        default layer.
+    conv_radius_m : float
+        Convolution radius in meters.
     classes_1 : str
         Class definition for semi-natural pixels.
     classes_0 : str
@@ -1085,9 +1126,9 @@ def functional_integrity_with_histogram(
         Output path for the histogram CSV.
     histo_png : str
         Output path for the histogram PNG.
-    pixel_max_m : float or None, default=None
-        Pixel size used to derive the kernel size. If ``None``, the native
-        raster resolution is used.
+    buffer_m : float or None, default=None
+        Buffered calculation distance in meters. If ``None``, it is computed
+        from the effective convolution radius.
     n_jobs : int, default=7
         Number of worker processes.
     tile_px : int, default=2048
@@ -1111,30 +1152,44 @@ def functional_integrity_with_histogram(
         res_x = abs(transform.a)
         res_y = abs(transform.e)
         raster_pixel_size = max(res_x, res_y)
-        pixel_max_m = raster_pixel_size if pixel_max_m is None else pixel_max_m
 
-        kernel_size = int(2 * int((conv_size_m / (pixel_max_m * 2))) + 1)
+        kernel_size = int(2 * int(conv_radius_m / raster_pixel_size) + 1)
         kernel_size = max(3, kernel_size | 1)
         radius_px = kernel_size // 2
-        requested_radius_m = conv_size_m / 2.0
-        effective_radius_m = radius_px * pixel_max_m
-        buffer_m = effective_radius_m
+        requested_diameter_m = conv_radius_m * 2.0
+        effective_radius_m = radius_px * raster_pixel_size
+        if buffer_m is None:
+            resolved_buffer_m = effective_radius_m + raster_pixel_size
+            buffer_source = "auto"
+        else:
+            resolved_buffer_m = float(buffer_m)
+            buffer_source = "user"
 
-        LOGGER.info("READ | Opening vector layer: %s", vector_path)
-        gdf = gpd.read_file(vector_path)
+        if resolved_buffer_m < effective_radius_m:
+            raise ValueError(
+                "BUFFER_M is smaller than the effective convolution radius. "
+                f"BUFFER_M={resolved_buffer_m:.3f} m, required minimum={effective_radius_m:.3f} m."
+            )
+
+        LOGGER.info("READ | Opening territory vector layer: %s", territory_vector)
+        if territory_layer is not None:
+            LOGGER.info("READ | Territory layer: %s", territory_layer)
+            gdf = gpd.read_file(territory_vector, layer=territory_layer)
+        else:
+            gdf = gpd.read_file(territory_vector)
         if gdf.empty:
-            raise ValueError("The input vector layer is empty.")
+            raise ValueError("The input territory vector layer is empty.")
         if gdf.crs is None:
-            raise ValueError("The input vector layer must have a defined CRS.")
+            raise ValueError("The input territory vector layer must have a defined CRS.")
         if gdf.crs.to_string() != src.crs.to_string():
-            LOGGER.info("TRANSFORM | Reprojecting vector layer to the raster CRS.")
+            LOGGER.info("TRANSFORM | Reprojecting territory vector layer to the raster CRS.")
             gdf = gdf.to_crs(src.crs)
 
         geom_territory = unary_union(gdf.geometry)
         if geom_territory.is_empty:
             raise ValueError("The dissolved territory geometry is empty.")
 
-        geom_buffer = geom_territory.buffer(buffer_m)
+        geom_buffer = geom_territory.buffer(resolved_buffer_m)
         if geom_buffer.is_empty:
             raise ValueError("The buffered territory geometry is empty.")
 
@@ -1172,12 +1227,13 @@ def functional_integrity_with_histogram(
 
         if VERBOSE:
             LOGGER.info("CONFIG | Raster input                    : %s", raster_path)
-            LOGGER.info("CONFIG | Vector input                    : %s", vector_path)
-            LOGGER.info("CONFIG | Effective resolution            : %.3f m/px", pixel_max_m)
-            LOGGER.info("CONFIG | Requested convolution diameter  : %.1f m", conv_size_m)
-            LOGGER.info("CONFIG | Requested convolution radius    : %.1f m", requested_radius_m)
+            LOGGER.info("CONFIG | Territory vector input          : %s", territory_vector)
+            LOGGER.info("CONFIG | Effective resolution            : %.3f m/px", raster_pixel_size)
+            LOGGER.info("CONFIG | Requested convolution radius    : %.1f m", conv_radius_m)
+            LOGGER.info("CONFIG | Requested convolution diameter  : %.1f m", requested_diameter_m)
             LOGGER.info("CONFIG | Effective convolution radius    : %.3f m (%s px)", effective_radius_m, radius_px)
-            LOGGER.info("CONFIG | Automatic buffer distance       : %.3f m", buffer_m)
+            LOGGER.info("CONFIG | Buffer source                   : %s", buffer_source)
+            LOGGER.info("CONFIG | Buffer distance used            : %.3f m", resolved_buffer_m)
             LOGGER.info("CONFIG | Territory window                : %s x %s px", int(territory_window.width), int(territory_window.height))
             LOGGER.info("CONFIG | Buffered calculation window     : %s x %s px", int(processing_window.width), int(processing_window.height))
             LOGGER.info("CONFIG | Parallel jobs                   : %s", n_jobs)
@@ -1210,14 +1266,14 @@ def functional_integrity_with_histogram(
         overlaps, unclassified, _ = analyze_raster_values(unique_vals, ranges_1, ranges_0, ranges_null)
         print_raster_analysis(unique_vals, overlaps, unclassified)
 
-        if overlaps and STRICT_VALIDATION:
+        if overlaps:
             lines = [f"{value} -> {', '.join(memberships)}" for value, memberships in overlaps]
             raise ValueError(
                 "Some raster values are assigned to multiple classes. "
                 "Each value must belong to exactly one class:\n - " + "\n - ".join(lines)
             )
 
-        if unclassified and STRICT_VALIDATION:
+        if unclassified:
             raise ValueError(
                 "Some raster values are present in the input raster but missing from "
                 "CLASSES_1, CLASSES_0, and CLASSES_NULL:\n - " + "\n - ".join(map(str, unclassified))
@@ -1265,7 +1321,7 @@ def functional_integrity_with_histogram(
                         int(src_win.height),
                     )
                     dst_binary.write(
-                        np.nan_to_num(sn_tile, nan=-9999.0).astype(np.float32),
+                        np.nan_to_num(sn_tile, nan=OUTPUT_NODATA).astype(np.float32),
                         1,
                         window=out_win,
                     )
@@ -1389,7 +1445,7 @@ def functional_integrity_with_histogram(
                 fi_tile[tile_mask_null] = np.nan
 
                 dst_integrity.write(
-                    np.nan_to_num(fi_tile, nan=-9999.0).astype(np.float32),
+                    np.nan_to_num(fi_tile, nan=OUTPUT_NODATA).astype(np.float32),
                     1,
                     window=future_meta["out_window"],
                 )
@@ -1433,13 +1489,13 @@ def functional_integrity_with_histogram(
 
     bins, counts, total_valid = compute_histogram(
         out_tif,
-        bin_width=BIN_WIDTH,
-        exclude_zero=EXCLUDE_ZERO_IN_HISTOGRAM,
+        bin_width=HIST_BIN_WIDTH,
+        exclude_zero=HIST_EXCLUDE_ZERO,
     )
     bins_left = bins[:-1]
     bins_right = bins[1:]
     proportions = (counts / total_valid) if total_valid > 0 else np.zeros_like(counts, dtype=float)
-    thr_results = summarize_thresholds(counts, total_valid, THRESHOLDS, BIN_WIDTH)
+    thr_results = summarize_thresholds(counts, total_valid, HIST_THRESHOLDS, HIST_BIN_WIDTH)
 
     LOGGER.info("WRITE | Writing histogram CSV.")
     write_histogram_csv(histo_csv, bins_left, bins_right, counts, proportions, thr_results)
@@ -1475,12 +1531,13 @@ def main() -> None:
     LOGGER.info("CONFIG | Histogram CSV: %s", output_paths["histo_csv"])
     LOGGER.info("CONFIG | Histogram PNG: %s", output_paths["histo_png"])
     LOGGER.info("CONFIG | Execution log: %s", output_paths["log_file"])
-    LOGGER.info("CONFIG | Exclude zero values from histogram: %s", EXCLUDE_ZERO_IN_HISTOGRAM)
+    LOGGER.info("CONFIG | Exclude zero values from histogram: %s", HIST_EXCLUDE_ZERO)
 
     functional_integrity_with_histogram(
-        raster_path=RASTER_PATH,
-        vector_path=VECTOR_PATH,
-        conv_size_m=CONV_SIZE_M,
+        raster_path=INPUT_RASTER,
+        territory_vector=TERRITORY_VECTOR,
+        territory_layer=TERRITORY_LAYER,
+        conv_radius_m=CONV_RADIUS_M,
         classes_1=CLASSES_1,
         classes_0=CLASSES_0,
         classes_null=CLASSES_NULL,
@@ -1488,7 +1545,7 @@ def main() -> None:
         sn_tif=output_paths["sn_tif"],
         histo_csv=output_paths["histo_csv"],
         histo_png=output_paths["histo_png"],
-        pixel_max_m=PIXEL_MAX_M,
+        buffer_m=BUFFER_M,
         n_jobs=N_JOBS,
         tile_px=TILE_PX,
     )

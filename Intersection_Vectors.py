@@ -67,30 +67,25 @@ from shapely.geometry import MultiPolygon
 from tqdm import tqdm
 
 # =============================================================================
-# 1. USER PARAMETERS
+# USER PARAMETERS
 # =============================================================================
-
-# Input datasets.
+# -------------------------
+# Inputs
+# -------------------------
+# Inputs layers
 INPUT_PRIMARY_DATASET: str = (
-    r"path/to/primary_layer"
+    r"path/to/primary_layer.gpkg"
 )
 INPUT_SECONDARY_DATASET: str = (
-    r"path/to/secondary_layer"
+    r"path/to/secondary_layer.gpkg"
 )
-
-# Output dataset.
-OUTPUT_GPKG: str = (
-    r"path/to/output.gpkg"
-)
-OUTPUT_LAYER_NAME: str = "primary_secondary_intersection"
-
 # Input fields.
-PRIMARY_FIELD: str = "field_name"
-SECONDARY_FIELD: str = "field_name"
+PRIMARY_FIELD: str = "numero" #Example field name
+SECONDARY_FIELD: str = "code_physio" #Example field name
 
-# Output field.
-OUTPUT_CODE_FIELD: str = "Code_Primary_Secondary"
-
+# -------------------------
+# Parameters
+# -------------------------
 # Geometry preprocessing before overlay.
 # - "off"   : no preprocessing before overlay.
 # - "light" : drop null/empty and non-polygon geometries only.
@@ -98,7 +93,6 @@ OUTPUT_CODE_FIELD: str = "Code_Primary_Secondary"
 GEOMETRY_PREPROCESSING_MODE: str = "light"
 
 # Recoding rules.
-#
 # Each rule is evaluated in order.
 # If several rules match the same polygon, the last matching rule wins.
 # - primary: expected value in PRIMARY_FIELD
@@ -107,18 +101,51 @@ GEOMETRY_PREPROCESSING_MODE: str = "light"
 # - output: value written to OUTPUT_CODE_FIELD if the rule matches
 #           (keep it integer-compatible if the result will feed Integrity_Vector.py)
 RULES: list[dict[str, Any]] = [
-    {"primary": 12, "secondary_in": {3301, 3302, 8001}, "secondary_not_in": None, "output": 120}, # example rule
+    {"primary": 12, "secondary_in": {3301, 3302, 8001}, "secondary_not_in": None, "output": 120}, #example from test
+    {"primary": 12, "secondary_in": {3200, 3300}, "secondary_not_in": None, "output": 121}, #example from test
 ]
 
-# Parallelization parameters.
-N_CORES: int = 7
-CHUNK_SIZE: int = 2000
+# -------------------------
+# Outputs
+# -------------------------
+# Output layer.
+OUTPUT_GPKG: str = (
+    r"path/to/output.gpkg"
+)
+OUTPUT_LAYER_NAME: str = "primary_secondary_intersection"
 
-# General settings.
-LOG_LEVEL: str = "INFO"
+# Output field.
+OUTPUT_CODE_FIELD: str = "Code_Primary_Secondary"
 
+
+# -------------------------
+# Parallelization and chunking
+# -------------------------
+# Modify these parameters to optimize the efficiency of the program
+N_JOBS: int = 7 # Number of parallel worker processes; adapt to available CPU cores and RAM
+CHUNK_SIZE: int = 2000  # Primary features per overlay task; lower for complex geometries to reduce RAM use and improve load balancing
+
+
+# =============================================================================
+# INTERNAL CONSTANTS
+# =============================================================================
+
+# -------------------------
+# Geometry preprocessing modes
+# -------------------------
+# Technical list used to validate GEOMETRY_PREPROCESSING_MODE.
 VALID_GEOMETRY_PREPROCESSING_MODES = {"off", "light", "full"}
 
+# -------------------------
+# Rule validation keys
+# -------------------------
+# Technical list of keys required in every user-defined recoding rule.
+REQUIRED_RULE_KEYS = {"primary", "secondary_in", "secondary_not_in", "output"}
+
+# -------------------------
+# Settings for logging
+# -------------------------
+LOG_LEVEL: str = "INFO"
 
 # =============================================================================
 # LOGGING HELPERS
@@ -252,8 +279,6 @@ def normalize_series(series: pd.Series) -> pd.Series:
 # =============================================================================
 # 3. RULE HANDLING
 # =============================================================================
-
-REQUIRED_RULE_KEYS = {"primary", "secondary_in", "secondary_not_in", "output"}
 
 
 def compile_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -766,7 +791,7 @@ def run_overlay_with_optional_full_retry(
             primary_target,
             secondary_gdf,
             how="identity",
-            n_cores=N_CORES,
+            n_cores=N_JOBS,
             chunk_size=CHUNK_SIZE,
             progress_label="Identity overlay",
         )
@@ -800,7 +825,7 @@ def run_overlay_with_optional_full_retry(
                 retry_primary_target,
                 retry_secondary_gdf,
                 how="identity",
-                n_cores=N_CORES,
+                n_cores=N_JOBS,
                 chunk_size=CHUNK_SIZE,
                 progress_label="Identity overlay (retry with full cleaning)",
             )
@@ -872,7 +897,7 @@ def main() -> None:
     LOGGER.info("CONFIG | Secondary field: %s", SECONDARY_FIELD)
     LOGGER.info("CONFIG | Output code field: %s", OUTPUT_CODE_FIELD)
     LOGGER.info("CONFIG | Geometry preprocessing mode: %s", GEOMETRY_PREPROCESSING_MODE)
-    LOGGER.info("CONFIG | Parallel jobs: %s", N_CORES)
+    LOGGER.info("CONFIG | Parallel jobs: %s", N_JOBS)
     LOGGER.info("CONFIG | Chunk size: %s", CHUNK_SIZE)
 
     if primary_layer_name is not None:

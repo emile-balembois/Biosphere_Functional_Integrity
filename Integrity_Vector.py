@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Compute a biosphere functional integrity indicator that consists in a convolution of 1000m radius on a binary classified land cover database.  
+"""Compute a biosphere functional integrity indicator that consists in a convolution of 500m radius on a binary classified land cover database.  
 The program is designed to use a land cover database in VECTOR format.
 
 The program takes as input:
@@ -81,67 +81,85 @@ from tqdm import tqdm
 # =============================================================================
 # USER PARAMETERS
 # =============================================================================
-
 # -------------------------
 # Inputs
 # -------------------------
-INPUT_VECTOR: str = r"path/to/file"
-INPUT_LAYER: Optional[str] = None         # None = auto-detect the first layer containing FIELD_NAME
-FIELD_NAME: str = "layer_name"    # integer field used for classification and rasterization
+# Input layers
+INPUT_VECTOR: str = r"path/to/file.gpkg"
+INPUT_LAYER: Optional[str] = None         # optional; use only if the file contains several layers
+FIELD_NAME: str = "field_name"    # integer field used for classification and rasterization
 
-TERRITORY_VECTOR: str = r"path/to/file"
+TERRITORY_VECTOR: str = r"path/to/file.gpkg"
 TERRITORY_LAYER: Optional[str] = None     # optional; use only if the file contains several layers
 
 # -------------------------
-# Classes used for integrity
-# Same syntax as in the previous integrity script:
-# - individual values separated by spaces, commas, or semicolons
-# - ranges allowed with: "10 thru 20"
+# Parameters
 # -------------------------
-CLASSES_1: str = ""
-CLASSES_0: str = ""
-CLASSES_NULL: str = ""
+# Convolution parameters to compute integrity
+CONV_RADIUS_M: float = 500.0             # Radius of the convolution in meters, this value originates from Mohamed et al., 2024 methodology
+BUFFER_M: Optional[float] = None         # Buffer value in meters around TERRITORY_VECTOR where INPUT_VECTOR is rasterized for edge calculations; None = effective convolution radius + one raster pixel
+
+# Rasterization parameters
+RESOLUTION: float = 5.0 # Rasterization resolution in meters; adapt to the desired precision of the output analysis
+ALL_TOUCHED: bool = False  # False = burn pixels whose center is inside polygons; True = burn every touched pixel
+
+# Parameters for computing integrity (classification of the input vector field values)
+# Syntax: individual values separated by spaces, commas, or semicolons
+CLASSES_1: str = "8 9 10 121" # values for semi-natural habitat - example from test
+CLASSES_0: str = "1 2 3 4 11 12 13 14 15 120" # values for non semi-natural habitat - example from test
+CLASSES_NULL: str = "5 6 7" # values ignored in integrity calculation - example from test
+
+# Histogram parameters
+HIST_BIN_WIDTH: float = 0.01 # Bin width used to represent the histogram of integrity values
+HIST_THRESHOLDS: list[float] = [0.25] # Thresholds highlighted in the histogram, aligned with Mohamed et al., 2024
 
 # -------------------------
-# Rasterization outputs
+# Outputs
 # -------------------------
+# Rasterization output
 RASTERIZED_TIF: str = r"path/to/file.tif"
-RESOLUTION: float = 5.0
-ALL_TOUCHED: bool = False
-RASTER_NODATA: int = -2147483648          # int32 nodata sentinel for the classified raster
+# Output directory
+OUTPUT_DIR: str = r"path/to/directory"  # output files are written directly inside this directory
 
 # -------------------------
-# Integrity and histogram outputs
+# Parallelization and tiling
 # -------------------------
-OUTPUT_DIR: str = r"path/to/directory"  # creates or reuses an "Output" subfolder inside
-CONV_SIZE_M: float = 1000.0               # kernel diameter in meters
-PIXEL_MAX_M: Optional[float] = None       # if None, use the true raster resolution
-BUFFER_M: Optional[float] = None          # None = auto-compute from the convolution kernel
-OUTPUT_NODATA: float = -9999.0
-KERNEL_SHAPE: str = "circular_fft"       # "circular_fft" or "box"
+# Modify these parameters to optimize the efficiency of the program
+N_JOBS: int = 7 # Number of parallel worker processes; adapt to available CPU cores and RAM
+TILE_PX: int = 2048  # Width/height of processing tiles in pixels; lower for memory-limited runs, higher for faster processing when RAM allows
+
+
+# =============================================================================
+# INTERNAL CONSTANTS
+# =============================================================================
+# -------------------------
+# Settings for logging
+# -------------------------
+VERBOSE: bool = True # If False, only warnings and errors are logged to the console. This does not affect file logging.
+LOG_LEVEL: str = "INFO" 
 
 # -------------------------
-# Histogram settings
-# Same logic and style as the original histogram script.
+# Raster NoData sentinels
 # -------------------------
-HIST_BIN_WIDTH: float = 0.01
-HIST_THRESHOLDS: List[float] = [0.25]
-HIST_EXCLUDE_ZERO: bool = False
+# Technical values written in GeoTIFF files to represent missing data.
+# They should only be changed if the raster dtypes are changed as well.
+RASTER_NODATA: int = -2147483648          # int32 sentinel for the classified raster
+OUTPUT_NODATA: float = -9999.0            # float32 sentinel for output rasters
 
 # -------------------------
-# Parallelization / tiling
+# Functional integrity calculation settings
 # -------------------------
-N_JOBS: int = 7
-TILE_PX: int = 2048
+KERNEL_SHAPE: str = "circular_fft"      # Convolution method: "circular_fft" gives the intended circular neighborhood; "box" is faster but uses a square window and does not match the functional integrity definition
 
 # -------------------------
-# General settings
+# Histogram representation settings
 # -------------------------
-STRICT_VALIDATION: bool = True
-VERBOSE: bool = True
-LOG_LEVEL: str = "INFO"
+HIST_EXCLUDE_ZERO: bool = False # Whether to exclude zero values from the histogram. This can be set to True to improve the visibility of the distribution of non-zero values if zero is over-represented in the output.
 
+# -------------------------
 # GeoTIFF creation options
+# -------------------------
+# Technical creation options shared by generated GeoTIFF rasters.
 RIO_PROFILE_KW: Dict = dict(
     driver="GTiff",
     compress="lzw",
@@ -255,7 +273,7 @@ def resolve_output_dir(base_dir: str) -> str:
     Parameters
     ----------
     base_dir : str
-        Parent directory configured by the user.
+        Output directory configured by the user.
 
     Returns
     -------
@@ -263,14 +281,9 @@ def resolve_output_dir(base_dir: str) -> str:
         Absolute path to the output directory.
     """
     if not base_dir or not base_dir.strip():
-        raise ValueError("OUTPUT_DIR must point to a parent directory.")
+        raise ValueError("OUTPUT_DIR must point to an output directory.")
 
-    normalized = os.path.normpath(os.path.abspath(base_dir))
-    if os.path.basename(normalized).lower() == "output":
-        output_dir = normalized
-    else:
-        output_dir = os.path.join(normalized, "Output")
-
+    output_dir = os.path.normpath(os.path.abspath(base_dir))
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
@@ -281,7 +294,7 @@ def build_output_paths(base_dir: str) -> dict[str, str]:
     Parameters
     ----------
     base_dir : str
-        Parent directory configured by the user.
+        Output directory configured by the user.
 
     Returns
     -------
@@ -1441,16 +1454,14 @@ def process_tile_timed(args):
         return False, repr(exc), dt, rr, cc
 
 
-def compute_kernel_size(conv_size_m: float, pixel_size_m: float) -> int:
-    diameter_px = max(1.0, conv_size_m / pixel_size_m)
-    k_size = max(3, int(round(diameter_px)))
-    if k_size % 2 == 0:
-        k_size += 1
-    return k_size
+def compute_kernel_size(conv_radius_m: float, pixel_size_m: float) -> int:
+    """Return the odd kernel size matching the requested radius."""
+    radius_px = max(1, int(conv_radius_m / pixel_size_m))
+    return max(3, 2 * radius_px + 1)
 
 
 def resolve_buffer_m(
-    conv_size_m: float,
+    conv_radius_m: float,
     pixel_size_m: float,
     buffer_m: Optional[float],
 ) -> Tuple[float, int, float, str]:
@@ -1467,7 +1478,7 @@ def resolve_buffer_m(
     source_label : str
         'auto' or 'user'.
     """
-    kernel_size = compute_kernel_size(conv_size_m, pixel_size_m)
+    kernel_size = compute_kernel_size(conv_radius_m, pixel_size_m)
     radius_px = kernel_size // 2
     effective_radius_m = radius_px * pixel_size_m
 
@@ -1491,8 +1502,7 @@ def compute_integrity(
     ranges_1: Sequence[Tuple[int, int]],
     ranges_0: Sequence[Tuple[int, int]],
     ranges_null: Sequence[Tuple[int, int]],
-    conv_size_m: float,
-    pixel_max_m: Optional[float],
+    conv_radius_m: float,
     buffer_m: float,
     tile_px: int,
     n_jobs: int,
@@ -1517,11 +1527,8 @@ def compute_integrity(
         Territory bounds in the raster CRS.
     ranges_1, ranges_0, ranges_null : sequence of tuple of int
         Inclusive value ranges for the three class groups.
-    conv_size_m : float
-        Convolution diameter in meters.
-    pixel_max_m : float or None
-        Pixel size used to derive the kernel size. If ``None``, the raster
-        resolution is used.
+    conv_radius_m : float
+        Convolution radius in meters.
     buffer_m : float
         Buffered calculation distance in meters.
     tile_px : int
@@ -1542,9 +1549,10 @@ def compute_integrity(
 
         res_x = abs(src.transform.a)
         res_y = abs(src.transform.e)
-        pixel_size = pixel_max_m if pixel_max_m is not None else max(res_x, res_y)
-        kernel_size = compute_kernel_size(conv_size_m, pixel_size)
+        pixel_size = max(res_x, res_y)
+        kernel_size = compute_kernel_size(conv_radius_m, pixel_size)
         radius = kernel_size // 2
+        requested_diameter_m = conv_radius_m * 2.0
 
         analysis_window = Window(0, 0, src.width, src.height)
         output_window = rasterio.windows.from_bounds(*territory_bounds, transform=src.transform)
@@ -1560,7 +1568,8 @@ def compute_integrity(
 
         LOGGER.info("CONFIG | Classified raster input: %s", raster_path)
         LOGGER.info("CONFIG | Pixel size used: %.3f m", pixel_size)
-        LOGGER.info("CONFIG | Kernel diameter: %.3f m", conv_size_m)
+        LOGGER.info("CONFIG | Requested convolution radius: %.3f m", conv_radius_m)
+        LOGGER.info("CONFIG | Requested convolution diameter: %.3f m", requested_diameter_m)
         LOGGER.info("CONFIG | Kernel size: %s px (radius %s px)", kernel_size, radius)
         LOGGER.info("CONFIG | Buffered raster size: %s x %s px", src.width, src.height)
         LOGGER.info("CONFIG | Integrity window size: %s x %s px", output_width, output_height)
@@ -2091,10 +2100,9 @@ def main() -> None:
             "Please reproject them to the same projected CRS before running the script."
         )
 
-    pixel_size_for_kernel = PIXEL_MAX_M if PIXEL_MAX_M is not None else RESOLUTION
     resolved_buffer_m, kernel_size, effective_radius_m, buffer_source = resolve_buffer_m(
-        conv_size_m=CONV_SIZE_M,
-        pixel_size_m=pixel_size_for_kernel,
+        conv_radius_m=CONV_RADIUS_M,
+        pixel_size_m=RESOLUTION,
         buffer_m=BUFFER_M,
     )
 
@@ -2115,9 +2123,9 @@ def main() -> None:
     LOGGER.info("CONFIG | Integrity territory bounds: %s", territory_bounds)
     LOGGER.info("CONFIG | Rasterization CRS: %s", crs)
     LOGGER.info("CONFIG | Rasterization resolution: %.3f m", RESOLUTION)
-    LOGGER.info("CONFIG | Requested convolution diameter: %.3f m", CONV_SIZE_M)
-    LOGGER.info("CONFIG | Requested convolution radius: %.3f m", CONV_SIZE_M / 2.0)
-    LOGGER.info("CONFIG | Pixel size for kernel: %.3f m", pixel_size_for_kernel)
+    LOGGER.info("CONFIG | Requested convolution radius: %.3f m", CONV_RADIUS_M)
+    LOGGER.info("CONFIG | Requested convolution diameter: %.3f m", CONV_RADIUS_M * 2.0)
+    LOGGER.info("CONFIG | Pixel size for kernel: %.3f m", RESOLUTION)
     LOGGER.info("CONFIG | Kernel size: %s px", kernel_size)
     LOGGER.info("CONFIG | Effective convolution radius: %.3f m", effective_radius_m)
     LOGGER.info("CONFIG | Buffer source: %s", buffer_source)
@@ -2178,8 +2186,7 @@ def main() -> None:
         ranges_1=ranges_1,
         ranges_0=ranges_0,
         ranges_null=ranges_null,
-        conv_size_m=CONV_SIZE_M,
-        pixel_max_m=PIXEL_MAX_M,
+        conv_radius_m=CONV_RADIUS_M,
         buffer_m=resolved_buffer_m,
         tile_px=TILE_PX,
         n_jobs=N_JOBS,
