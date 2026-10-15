@@ -1,0 +1,7 @@
+2026-05-18 11:12:31 | INFO     | CONFIG | Output directory: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder
+2026-05-18 11:12:31 | INFO     | CONFIG | Integrity output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder\integrity_output.tif
+2026-05-18 11:12:31 | INFO     | CONFIG | Binary output: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder\binary_output.tif
+2026-05-18 11:12:31 | INFO     | CONFIG | Histogram CSV: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder\histogram.csv
+2026-05-18 11:12:31 | INFO     | CONFIG | Histogram PNG: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder\histogram.png
+2026-05-18 11:12:31 | INFO     | CONFIG | Execution log: C:\Users\emile.balembois\Desktop\Python\Biosphere_Functional_Integrity\path\to\folder\execution.log
+2026-05-18 11:12:31 | INFO     | CONFIG | Exclude zero values from histogram: False
