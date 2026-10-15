@@ -237,9 +237,9 @@ Article link:
 
 ## Credits
 
-This repository originates from a research conducted at UMR 5600 Environnement Villes et Sociétés - MINES Saint-Etienne 
-It have been elaborated based on a first program elaborated by Duli Rashid : https://github.com/douxlit/Biosphere-Functional-Integrity 
-It has benifited from the help and feedback of Antoine Giret (UMR 5600 EVS/MINES Saint-Etienne), Matthis Da Costa and Natacha Gondran (UMR 5600 EVS/MINES Saint-Etienne).
+This repository was developed by Emile Balembois as part of research conducted at UMR 5600 Environnement, Ville et Société (EVS), MINES Saint-Étienne.
+It builds on an initial program developed by Duli Rashid: https://github.com/douxlit/Biosphere-Functional-Integrity.
+Its development benefited from the help and feedback of Antoine Giret (UMR 5600 EVS/MINES Saint-Étienne), Matthis Da Costa, and Natacha Gondran (UMR 5600 EVS/MINES Saint-Étienne).
 
 ---
 
