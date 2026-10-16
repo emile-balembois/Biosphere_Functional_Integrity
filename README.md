@@ -241,6 +241,8 @@ This repository was developed by Emile Balembois as part of research conducted a
 It builds on an initial program developed by Duli Rashid: https://github.com/douxlit/Biosphere-Functional-Integrity.
 Its development benefited from the help and feedback of Antoine Giret (UMR 5600 EVS/MINES Saint-Étienne), Matthis Da Costa, and Natacha Gondran (UMR 5600 EVS/MINES Saint-Étienne).
 
+An AI tool (OpenAI Codex) was used to assist in the development of this repository. The development process and the accuracy of the AI-generated outputs were checked throughout the creation of the repository.
+
 ---
 
 ## Support
